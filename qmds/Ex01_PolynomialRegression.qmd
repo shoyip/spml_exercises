@@ -168,7 +168,7 @@ rng = np.random.default_rng(42)
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12,4))
 
-fig.suptitle("$P=100, P_{test}=20$ case")
+fig.suptitle("$P=10000, P_{test}=100$ case")
 for func_name, ax in zip(['A', 'B'], [ax1, ax2]):
     ax.set_title(f'Original and test dataset for function {func_name}')
     x_t, y_t = get_dataset(x_min=0, x_max=1.25,
