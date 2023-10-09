@@ -1,0 +1,185 @@
+---
+title: Generate the training set
+jupyter: python3
+---
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+
+rng = np.random.default_rng(42)
+```
+
+
+We will generate data from two *hidden* functions:
+$$
+f_A(x) = 2x,
+$$
+and
+$$
+f_B(x) = 2x - 10x^5 + 15x^{10}.
+$$
+
+
+```{python}
+x_train = rng.uniform(low=0, high=1, size=(10))
+y_train_a = 2 * x_train
+y_train_b = 2 * x_train - 10 * np.power(x_train, 5) + 15 * np.power(x_train, 10)
+```
+
+```{python}
+plt.figure()
+plt.scatter(x_train, y_train_a, label='Function A', s=4)
+plt.scatter(x_train, y_train_b, label='Function B', s=4)
+plt.legend()
+plt.show()
+```
+
+```{python}
+p1_a = np.polyfit(x_train, y_train_a, 1)
+p3_a = np.polyfit(x_train, y_train_a, 3)
+p10_a = np.polyfit(x_train, y_train_a, 10)
+
+f_pred_1a = np.poly1d(p1_a)
+f_pred_3a= np.poly1d(p3_a)
+f_pred_10a= np.poly1d(p10_a)
+
+p1_b = np.polyfit(x_train, y_train_b, 1)
+p3_b = np.polyfit(x_train, y_train_b, 3)
+p10_b = np.polyfit(x_train, y_train_b, 10)
+
+f_pred_1b = np.poly1d(p1_b)
+f_pred_3b= np.poly1d(p3_b)
+f_pred_10b= np.poly1d(p10_b)
+```
+
+## Generate the test set ($\sigma=0, p=10, p_t=20$ case)
+
+```{python}
+def funcA(x):
+    return 2*x
+
+def funcB(x):
+    return 2*x - 10*x**5 + 15*x**10
+```
+
+```{python}
+x_test_1 = rng.uniform(low=0, high=1.25, size=(20))
+y_test_1a = 2 * x_test_1
+y_test_1b = 2 * x_test_1 - 10 * np.power(x_test_1, 5) + 15 * np.power(x_test_1, 10)
+
+xs = np.linspace(start=0, stop=1.25, num=150)
+
+plt.figure()
+plt.plot(xs, f_pred_1a(xs))
+plt.plot(xs, f_pred_3a(xs))
+plt.plot(xs, f_pred_10a(xs))
+plt.scatter(x_test_1, y_test_1a, s=6)
+plt.show()
+
+plt.figure()
+plt.plot(xs, f_pred_1b(xs))
+plt.plot(xs, f_pred_3b(xs))
+plt.plot(xs, f_pred_10b(xs))
+plt.scatter(x_test_1, y_test_1b, s=6)
+plt.show()
+```
+
+## Generate the training and test set ($\sigma=1, p=100, p_t=20$ case)
+
+```{python}
+x_train = rng.uniform(low=0, high=1, size=(100))
+y_train_a = 2 * x_train
+y_train_b = 2 * x_train - 10 * np.power(x_train, 5) + 15 * np.power(x_train, 10)
+```
+
+```{python}
+p1_a = np.polyfit(x_train, y_train_a, 1)
+p3_a = np.polyfit(x_train, y_train_a, 3)
+p10_a = np.polyfit(x_train, y_train_a, 10)
+
+f_pred_1a = np.poly1d(p1_a)
+f_pred_3a= np.poly1d(p3_a)
+f_pred_10a= np.poly1d(p10_a)
+
+p1_b = np.polyfit(x_train, y_train_b, 1)
+p3_b = np.polyfit(x_train, y_train_b, 3)
+p10_b = np.polyfit(x_train, y_train_b, 10)
+
+f_pred_1b = np.poly1d(p1_b)
+f_pred_3b= np.poly1d(p3_b)
+f_pred_10b= np.poly1d(p10_b)
+```
+
+```{python}
+for i in range(5):
+    x_test_2 = rng.uniform(low=0, high=1.25, size=(20))
+    y_test_2a = funcA(x_test_2) + rng.normal(0, 1, 20)
+    y_test_2b = funcB(x_test_2) + rng.normal(0, 1, 20)
+    
+    xs = np.linspace(start=0, stop=1.25, num=150)
+    
+    plt.figure()
+    plt.plot(xs, f_pred_1a(xs))
+    plt.plot(xs, f_pred_3a(xs))
+    plt.plot(xs, f_pred_10a(xs))
+    plt.scatter(x_test_2, y_test_2a)
+    plt.show()
+    
+    plt.figure()
+    plt.plot(xs, f_pred_1b(xs))
+    plt.plot(xs, f_pred_3b(xs))
+    plt.plot(xs, f_pred_10b(xs))
+    plt.scatter(x_test_2, y_test_2b)
+    plt.show()
+```
+
+## Generate the training and test set ($\sigma=1, p=10000, p_t=100$ case)
+
+```{python}
+x_train = rng.uniform(low=0, high=1, size=(10_000))
+y_train_a = 2 * x_train
+y_train_b = 2 * x_train - 10 * np.power(x_train, 5) + 15 * np.power(x_train, 10)
+```
+
+```{python}
+p1_a = np.polyfit(x_train, y_train_a, 1)
+p3_a = np.polyfit(x_train, y_train_a, 3)
+p10_a = np.polyfit(x_train, y_train_a, 10)
+
+f_pred_1a = np.poly1d(p1_a)
+f_pred_3a= np.poly1d(p3_a)
+f_pred_10a= np.poly1d(p10_a)
+
+p1_b = np.polyfit(x_train, y_train_b, 1)
+p3_b = np.polyfit(x_train, y_train_b, 3)
+p10_b = np.polyfit(x_train, y_train_b, 10)
+
+f_pred_1b = np.poly1d(p1_b)
+f_pred_3b= np.poly1d(p3_b)
+f_pred_10b= np.poly1d(p10_b)
+```
+
+```{python}
+for i in range(5):
+    x_test_2 = rng.uniform(low=0, high=1.25, size=(100))
+    y_test_2a = funcA(x_test_2) + rng.normal(0, 1, 100)
+    y_test_2b = funcB(x_test_2) + rng.normal(0, 1, 100)
+    
+    xs = np.linspace(start=0, stop=1.25, num=150)
+    
+    plt.figure()
+    plt.plot(xs, f_pred_1a(xs))
+    plt.plot(xs, f_pred_3a(xs))
+    plt.plot(xs, f_pred_10a(xs))
+    plt.scatter(x_test_2, y_test_2a)
+    plt.show()
+    
+    plt.figure()
+    plt.plot(xs, f_pred_1b(xs))
+    plt.plot(xs, f_pred_3b(xs))
+    plt.plot(xs, f_pred_10b(xs))
+    plt.scatter(x_test_2, y_test_2b)
+    plt.show()
+```
+
