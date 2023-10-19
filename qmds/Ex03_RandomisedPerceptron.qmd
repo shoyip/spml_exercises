@@ -179,7 +179,7 @@ Now let us clearly state this by plotting the behaviour of the averages of the t
 ```{python}
 plt.figure()
 plt.title('Test error vs. training set size')
-plt.plot([1, 10, 20, 50, 100, 150, 200], epsilons_P)
+plt.scatter([1, 10, 20, 50, 100, 150, 200], epsilons_P)
 plt.xlabel('$P$')
 plt.ylabel('$\epsilon_{test}$')
 plt.grid()
@@ -299,7 +299,27 @@ plt.show()
 
 ## Step 10: Find a way to represent the data
 
-As we hinted in the plot below, we may make the hypothesis that the reduction of error with increasing $P$ is an **exponential decay**, and compare the slopes for different sizes $N$ of the input vector. To attain this we might fit the log curves in order to linearise the exponential behaviour and compare the slopes.
+In order to superimpose the two plots we may play with a rescaling of the x-axis, for example:
+
+```{python}
+plt.figure()
+plt.title('Test error vs. training set size for $N=20,40$')
+plt.scatter([num*2 for num in [1, 10, 20, 50, 100, 150, 200]], epsilons_P, label='$N=20$ with $P$\'s multiplied by a factor 2')
+plt.scatter([1, 2, 20, 40, 100, 200, 300], (epsilons_P_N40), label='$N=40$')
+plt.xlabel('$P$')
+plt.ylabel('$\epsilon_{test}$')
+plt.legend()
+plt.grid()
+plt.show()
+```
+
+In this case we used a factor 2. This means that for double the input vector size, the $P$ values required to reach the same amount of test error convergence are the double. This is what we expect from the fact that (see, for example, Engel & Van den Broek p. 12):
+
+$$
+P = \alpha N
+$$
+
+Another way to see this may be the following: as we hinted in the plot below, we may make the hypothesis that the reduction of error with increasing $P$ is an **exponential decay**, and compare the slopes for different sizes $N$ of the input vector. To attain this we might fit the log curves in order to linearise the exponential behaviour and compare the slopes.
 
 ```{python}
 p20 = np.polyfit([1, 10, 20, 50, 100, 150, 200], np.log(epsilons_P), 1)
@@ -323,23 +343,5 @@ print('The slopes are', p20[0], p40[0])
 print('The inverse of the slopes (decay time in terms of P) are', -1./p20[0], -1./p40[0])
 ```
 
-As the size $N$ of input vectors increases, the error decay is reached for higher values of the training set size $P$. In particular for double the size of the input vector, the decay time nearly doubles (it is actually slightly more than the double).
-
-This is what we expect from the fact that (see, for example, Engel & Van den Broek p. 12):
-
-$$
-P = \alpha N
-$$
-
-where $\alpha$ is of order 1. It is a bit dangerous to make assumptions from two data points (with no regards whatsoever to the propagation of errors, either), but if the latter statement holds we can clearly see that $P_{typical}$ grows linearly with $N$. In our case $\alpha$ would have a value of
-
-```{python}
-decay20 = -1./p20[0]
-decay40 = -1./p40[0]
-
-alpha20 = decay20 / 20
-alpha40 = decay40 / 40
-
-print('Alphas for N=20 and N=40 are', alpha20, alpha40)
-```
+As the size $N$ of input vectors increases, the error decay is reached for higher values of the training set size $P$. In particular for double the size of the input vector, the decay time nearly doubles.
 
