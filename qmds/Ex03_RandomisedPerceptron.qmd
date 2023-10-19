@@ -25,7 +25,7 @@ and the weights of the perfect perceptron are $J_i^* = 2^{N/2-i}$ in the first h
 In the **training** part, the initial weights will be initialised at random for the student perceptron. It will be attempting learning from the teacher perceptron by applying a learning rule, which is in our case
 
 $$
-\vec J (t+1) = \vec J + \frac{1}{\sqrt{N}} \sigma^{\mu}_T \vec \xi^{\mu} (1+\vec r)
+\vec J (t+1) = \vec J + \frac{1}{\sqrt{N}} \sigma^{\mu}_T \vec \xi^{\mu} (1+ r)
 $$
 
 where $r\sim\mathcal{N}(0, \sqrt{50})$.
@@ -332,10 +332,6 @@ P = \alpha N
 $$
 
 where $\alpha$ is of order 1. It is a bit dangerous to make assumptions from two data points (with no regards whatsoever to the propagation of errors, either), but if the latter statement holds we can clearly see that $P_{typical}$ grows linearly with $N$. In our case $\alpha$ would have a value of
-
-$$
-\alpha \sim 4.6
-$$
 
 ```{python}
 decay20 = -1./p20[0]
