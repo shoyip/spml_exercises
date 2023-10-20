@@ -345,3 +345,17 @@ print('The inverse of the slopes (decay time in terms of P) are', -1./p20[0], -1
 
 As the size $N$ of input vectors increases, the error decay is reached for higher values of the training set size $P$. In particular for double the size of the input vector, the decay time nearly doubles.
 
+Yet another way (suggested by the teacher) to rescale is to divide the $x$ axis by $N$, in order to have values that do not depend on $N$ anymore. This yields the same behaviour seen in the first example.
+
+```{python}
+plt.figure()
+plt.title('Test error vs. training set size for $N=20,40$')
+plt.scatter(np.array([1, 10, 20, 50, 100, 150, 200])/20, (epsilons_P), label='$N=20$')
+plt.scatter(np.array([1, 2, 20, 40, 100, 200, 300])/40, (epsilons_P_N40), label='$N=40$')
+plt.xlabel('$P$')
+plt.ylabel('$\epsilon_{test}$')
+plt.legend()
+plt.grid()
+plt.show()
+```
+
