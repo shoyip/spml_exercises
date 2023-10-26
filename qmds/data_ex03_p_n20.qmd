@@ -1,0 +1,21 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "�NUMPY\u0001\u0000v\u0000{'descr': '<f8', 'fortran_order': False, 'shape': (2, 7), }                                                          \n",
+        "\u0000\u0000\u0000\u0000\u0000\u0000�?\u0000\u0000\u0000\u0000\u0000\u0000$@\u0000\u0000\u0000\u0000\u0000\u00004@\u0000\u0000\u0000\u0000\u0000\u0000I@\u0000\u0000\u0000\u0000\u0000\u0000Y@\u0000\u0000\u0000\u0000\u0000�b@\u0000\u0000\u0000\u0000\u0000\u0000i@�a�\r���?�V`���?�\bS�K��?s����?�\u0012�e\u0016��?J�y\u001c\u0006�?RN����?"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "python39264bitd9bdce09368243b7aae970e92fd1d830",
+      "language": "python",
+      "display_name": "Python 3.9.2 64-bit"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 4
+}

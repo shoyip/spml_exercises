@@ -34,6 +34,10 @@ where $r\sim\mathcal{N}(0, \sqrt{50})$.
 ```{python}
 import numpy as np
 import matplotlib.pyplot as plt
+import multiprocessing
+from functools import partial
+from joblib import Parallel, delayed
+import time
 ```
 
 ```{python}
@@ -137,39 +141,108 @@ for P_idx, P in enumerate([1, 10, 20, 50, 100, 150, 200]):
     print('- the test error for P =', P, 'is', epsilon*1./P_test)
 ```
 
-We can clearly see that there is a particular behaviour as $P$ increases, in particular we see that the training error is decreasing. What happens if we do this many times? How will the training error be distributed over, say, a 1000 instantiations of the test?
+We can clearly see that there is a particular behaviour as $P$ increases, in particular we see that the training error is decreasing. What happens if we do this many times? How will the training error be distributed over, say, a 1000 instantiations of the train-test process?
 
 ## Step 6: Do this 1000 times and evaluate the average test error
 
 We can plot histograms of the result and see the distributions of test errors over a set of different $P$ values. This result doesn't come as totally unexpected: the bigger the training set, the lesser the errors we make. We could also see a hint of this by seeing that array elements of higher $P$ weight vectors were more and more similar to those of the perfect perceptron.
 
 ```{python}
-P_test = 1000
+def train_test_loop(i, P, N, max_iter=10_000):
+    prefact = 1./np.sqrt(N)
+    pp_weights = get_pp_weights(N)
+    final_weights = []
+    
+    random_weights = np.random.normal(0, 1, size=(N))    
+    x = np.random.randint(0, 2, size=(P, N))
+    y_teacher = perceptron(x, pp_weights)
+    
+    # search for convergence (train_error=0)
+    for t in range(max_iter):
+        epsilon_t = 0
+        # for every t apply the learning rule
+        # once weights are updated along mu, update the result
+        y_student = perceptron(x, random_weights)
+        # compute the current y_student value
+        for mu in range(P):
+            if (y_student[mu] != y_teacher[mu]):
+                # update weights
+                random_weights += prefact * y_teacher[mu] * x[mu] * (1 + np.random.normal(0, np.sqrt(50), size=N))
+                epsilon_t += 1
+        if (epsilon_t == 0):
+            #print('Training for P =', P, 'converged in time', t)
+            break
+    
+    # now test once for the test_error over all the samples
+    x_test = np.random.randint(0, 2, size=(P_test, N))
+    y_test_true = perceptron(x_test, pp_weights)
+    y_test_pred = perceptron(x_test, random_weights)
+    epsilon_test = 0
+    for mu in range(P_test):
+        if (y_test_pred[mu] != y_test_true[mu]):
+            epsilon_test += 1
+    epsilon_test /= 1000.
 
-plt.figure()
-plt.title('Histogram of test error for $p=1000$ done 1000 times')
+    return epsilon_test
+```
 
-epsilons_P = []
+```{python}
+# I define partial functions, where I have just to set the i and P arguments
+ttloop20 = partial(train_test_loop, N=20)
+ttloop40 = partial(train_test_loop, N=40)
+```
 
-for P_idx, P in enumerate([1, 10, 20, 50, 100, 150, 200]):
-    epsilons = []
-    for i in range(1000):
-        x_test = np.random.randint(0, 2, size=(P_test, N))
-        y_test_true = perceptron(x_test, pp_weights)
-        y_test_pred = perceptron(x_test, final_weights[P_idx])
-        epsilon = 0
-        for mu in range(P_test):
-            if (y_test_pred[mu] != y_test_true[mu]):
-                epsilon += 1
-        epsilon /= 1000.
-        epsilons.append(epsilon)
-    plt.hist(epsilons, label=f'P = {P}', bins=10)
-    epsilons_P.append(np.mean(epsilons))
+```{python}
+# number of cores available
+n_cores = multiprocessing.cpu_count()
+```
 
-plt.xlim([0, 1])
-plt.legend()
-plt.show()
-plt.close()
+```{python}
+Ps_N20 = np.array([1, 10, 20, 50, 100, 150, 200])
+epsilon_means_N20 = []
+epsilon_stds_N20 = []
+for P in Ps_N20:
+    start = time.time()
+    epsilons = Parallel(n_jobs=n_cores)(delayed(ttloop20)(i, P=P) for i in range(1000))
+    epsilon_mean = np.mean(epsilons)
+    epsilon_std = np.std(epsilons) / np.sqrt(1000)
+    epsilon_means_N20.append(epsilon_mean)
+    epsilon_stds_N20.append(epsilon_std)
+    end = time.time()
+    print(f'For P={P}, eps=({round(epsilon_mean, 2)} +- {round(epsilon_std, 2)}), took {round(end-start)}s')
+```
+
+```{python}
+# THIS WAS THE PREVIOUS CODE (1 TRAIN 1000 TEST)
+
+# P_test = 1000
+
+# plt.figure()
+# plt.title('Histogram of test error for $p=1000$ done 1000 times')
+
+# epsilons_P_means = []
+# epsilons_P_stds = []
+
+# for P_idx, P in enumerate([1, 10, 20, 50, 100, 150, 200]):
+#     epsilons = []
+#     for i in range(1000):
+#         x_test = np.random.randint(0, 2, size=(P_test, N))
+#         y_test_true = perceptron(x_test, pp_weights)
+#         y_test_pred = perceptron(x_test, final_weights[P_idx])
+#         epsilon = 0
+#         for mu in range(P_test):
+#             if (y_test_pred[mu] != y_test_true[mu]):
+#                 epsilon += 1
+#         epsilon /= 1000.
+#         epsilons.append(epsilon)
+#     plt.hist(epsilons, label=f'P = {P}', bins=10)
+#     epsilons_P_means.append(np.mean(epsilons))
+#     epsilons_P_stds.append(np.std(epsilons))
+
+# plt.xlim([0, 1])
+# plt.legend()
+# plt.show()
+# plt.close()
 ```
 
 ## Step 7: Plot $\epsilon$ vs. $P$
@@ -179,7 +252,7 @@ Now let us clearly state this by plotting the behaviour of the averages of the t
 ```{python}
 plt.figure()
 plt.title('Test error vs. training set size')
-plt.scatter([1, 10, 20, 50, 100, 150, 200], epsilons_P)
+plt.errorbar(Ps_N20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='.b', markersize=1)
 plt.xlabel('$P$')
 plt.ylabel('$\epsilon_{test}$')
 plt.grid()
@@ -253,32 +326,51 @@ for P_idx, P in enumerate([1, 2, 20, 40, 100, 200, 300]):
 ```
 
 ```{python}
-P_test = 1000
+Ps_N40 = np.array([1, 2, 20, 40, 100, 200, 300])
+epsilon_means_N40 = []
+epsilon_stds_N40 = []
+for P in Ps_N40:
+    start = time.time()
+    epsilons = Parallel(n_jobs=n_cores)(delayed(ttloop40)(i, P=P) for i in range(1000))
+    epsilon_mean = np.mean(epsilons)
+    epsilon_std = np.std(epsilons) / np.sqrt(1000)
+    epsilon_means_N40.append(epsilon_mean)
+    epsilon_stds_N40.append(epsilon_std)
+    end = time.time()
+    print(f'For P={P}, eps=({round(epsilon_mean, 2)} +- {round(epsilon_std, 2)}), took {round(end-start)}s')
+```
 
-plt.figure()
-plt.title('Histogram of test error for $p=1000$ done 1000 times')
+```{python}
+# THIS WAS THE PREVIOUS CODE (1 TRAIN 1000 TEST)
 
-epsilons_P_N40 = []
+# P_test = 1000
 
-for P_idx, P in enumerate([1, 2, 20, 40, 100, 200, 300]):
-    epsilons = []
-    for i in range(1000):
-        x_test = np.random.randint(0, 2, size=(P_test, N))
-        y_test_true = perceptron(x_test, pp_weights)
-        y_test_pred = perceptron(x_test, final_weights[P_idx])
-        epsilon = 0
-        for mu in range(P_test):
-            if (y_test_pred[mu] != y_test_true[mu]):
-                epsilon += 1
-        epsilon /= 1000.
-        epsilons.append(epsilon)
-    plt.hist(epsilons, label=f'P = {P}', bins=10)
-    epsilons_P_N40.append(np.mean(epsilons))
+# plt.figure()
+# plt.title('Histogram of test error for $p=1000$ done 1000 times')
 
-plt.xlim([0, 1])
-plt.legend()
-plt.show()
-plt.close()
+# epsilons_P_N40_means = []
+# epsilons_P_N40_stds = []
+
+# for P_idx, P in enumerate([1, 2, 20, 40, 100, 200, 300]):
+#     epsilons = []
+#     for i in range(1000):
+#         x_test = np.random.randint(0, 2, size=(P_test, N))
+#         y_test_true = perceptron(x_test, pp_weights)
+#         y_test_pred = perceptron(x_test, final_weights[P_idx])
+#         epsilon = 0
+#         for mu in range(P_test):
+#             if (y_test_pred[mu] != y_test_true[mu]):
+#                 epsilon += 1
+#         epsilon /= 1000.
+#         epsilons.append(epsilon)
+#     plt.hist(epsilons, label=f'P = {P}', bins=10)
+#     epsilons_P_N40_means.append(np.mean(epsilons))
+#     epsilons_P_N40_stds.append(np.std(epsilons))
+
+# plt.xlim([0, 1])
+# plt.legend()
+# plt.show()
+# plt.close()
 ```
 
 ## Step 9: Plot $\epsilon$ vs. $P$ for $N=40, 20$
@@ -288,8 +380,8 @@ Let us compare the two plots.
 ```{python}
 plt.figure()
 plt.title('Test error vs. training set size for $N=20,40$')
-plt.scatter([1, 10, 20, 50, 100, 150, 200], (epsilons_P), label='$N=20$')
-plt.scatter([1, 2, 20, 40, 100, 200, 300], (epsilons_P_N40), label='$N=40$')
+plt.errorbar(Ps_N20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='.b', label='$N=20$')
+plt.errorbar(Ps_N40, epsilon_means_N40, yerr=epsilon_stds_N40, fmt='.r', label='$N=40$')
 plt.xlabel('$P$')
 plt.ylabel('$\epsilon_{test}$')
 plt.legend()
@@ -304,8 +396,8 @@ In order to superimpose the two plots we may play with a rescaling of the x-axis
 ```{python}
 plt.figure()
 plt.title('Test error vs. training set size for $N=20,40$')
-plt.scatter([num*2 for num in [1, 10, 20, 50, 100, 150, 200]], epsilons_P, label='$N=20$ with $P$\'s multiplied by a factor 2')
-plt.scatter([1, 2, 20, 40, 100, 200, 300], (epsilons_P_N40), label='$N=40$')
+plt.errorbar(2*Ps_N20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='.b', markersize=1, label='$N=20$ with $P$\'s multiplied by a factor 2')
+plt.errorbar(Ps_N40, epsilon_means_N40, yerr=epsilon_stds_N40, fmt='.r', markersize=1, label='$N=40$')
 plt.xlabel('$P$')
 plt.ylabel('$\epsilon_{test}$')
 plt.legend()
@@ -319,43 +411,44 @@ $$
 P = \alpha N
 $$
 
-Another way to see this may be the following: as we hinted in the plot below, we may make the hypothesis that the reduction of error with increasing $P$ is an **exponential decay**, and compare the slopes for different sizes $N$ of the input vector. To attain this we might fit the log curves in order to linearise the exponential behaviour and compare the slopes.
-
 ```{python}
-p20 = np.polyfit([1, 10, 20, 50, 100, 150, 200], np.log(epsilons_P), 1)
-p40 = np.polyfit([1, 2, 20, 40, 100, 200, 300], np.log(epsilons_P_N40), 1)
-f20 = np.poly1d(p20)
-f40 = np.poly1d(p40)
+# p20 = np.polyfit([1, 10, 20, 50, 100, 150, 200], np.log(epsilons_P), 1)
+# p40 = np.polyfit([1, 2, 20, 40, 100, 200, 300], np.log(epsilons_P_N40), 1)
+# f20 = np.poly1d(p20)
+# f40 = np.poly1d(p40)
 
-plt.figure()
-plt.title('Test error vs. training set size for $N=20,40$')
-plt.scatter([1, 10, 20, 50, 100, 150, 200], np.log(epsilons_P), label='$N=20$')
-plt.scatter([1, 2, 20, 40, 100, 200, 300], np.log(epsilons_P_N40), label='$N=40$')
-plt.plot([1, 10, 20, 50, 100, 150, 200], f20([1, 10, 20, 50, 100, 150, 200]))
-plt.plot([1, 2, 20, 40, 100, 200, 300], f40([1, 2, 20, 40, 100, 200, 300]))
-plt.xlabel('$P$')
-plt.ylabel('$\log\epsilon_{test}$')
-plt.legend()
-plt.grid()
-plt.show()
+# plt.figure()
+# plt.title('Test error vs. training set size for $N=20,40$')
+# plt.scatter([1, 10, 20, 50, 100, 150, 200], np.log(epsilons_P), label='$N=20$')
+# plt.scatter([1, 2, 20, 40, 100, 200, 300], np.log(epsilons_P_N40), label='$N=40$')
+# plt.plot([1, 10, 20, 50, 100, 150, 200], f20([1, 10, 20, 50, 100, 150, 200]))
+# plt.plot([1, 2, 20, 40, 100, 200, 300], f40([1, 2, 20, 40, 100, 200, 300]))
+# plt.xlabel('$P$')
+# plt.ylabel('$\log\epsilon_{test}$')
+# plt.legend()
+# plt.grid()
+# plt.show()
 
-print('The slopes are', p20[0], p40[0])
-print('The inverse of the slopes (decay time in terms of P) are', -1./p20[0], -1./p40[0])
+# print('The slopes are', p20[0], p40[0])
+# print('The inverse of the slopes (decay time in terms of P) are', -1./p20[0], -1./p40[0])
 ```
-
-As the size $N$ of input vectors increases, the error decay is reached for higher values of the training set size $P$. In particular for double the size of the input vector, the decay time nearly doubles.
 
 Yet another way (suggested by the teacher) to rescale is to divide the $x$ axis by $N$, in order to have values that do not depend on $N$ anymore. This yields the same behaviour seen in the first example.
 
 ```{python}
 plt.figure()
 plt.title('Test error vs. training set size for $N=20,40$')
-plt.scatter(np.array([1, 10, 20, 50, 100, 150, 200])/20, (epsilons_P), label='$N=20$')
-plt.scatter(np.array([1, 2, 20, 40, 100, 200, 300])/40, (epsilons_P_N40), label='$N=40$')
-plt.xlabel('$P$')
+plt.errorbar(Ps_N20/20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='.b', label='$N=20$', markersize=1)
+plt.errorbar(Ps_N40/40, epsilon_means_N40, yerr=epsilon_stds_N40, fmt='.r', label='$N=40$', markersize=1)
+plt.xlabel('α')
 plt.ylabel('$\epsilon_{test}$')
 plt.legend()
 plt.grid()
 plt.show()
+```
+
+```{python}
+np.savez('ex03_n20.npz', Ps_N20, epsilon_means_N20, epsilon_stds_N20)
+np.savez('ex03_n40.npz', Ps_N40, epsilon_means_N40, epsilon_stds_N40)
 ```
 
