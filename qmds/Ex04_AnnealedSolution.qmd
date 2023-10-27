@@ -1,0 +1,297 @@
+---
+title: 'Exercise 04: The annealed solution to randomised perceptron learning'
+jupyter: python3
+---
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+```
+
+
+We now take the numerical results of Exercise 3 and compare them to the analytical behaviour that we would expect. In particular, we are studying the behaviour of the generalization error $\epsilon$ as $\alpha=P/N$ grows.
+
+The analytic expression is the following
+
+$$
+\alpha = \frac{(1-\epsilon) \pi}{\tan(\pi\epsilon)}
+$$
+
+The data given by the previous exercise are plotted here.
+
+
+```{python}
+Ps_N20, epsilon_means_N20, epsilon_stds_N20 = list(np.load('/home/shoichi/Documenti/FisicaLM/Cammarota/spml_exercises/notebooks/ex03_n20.npz').values())
+Ps_N40, epsilon_means_N40, epsilon_stds_N40 = list(np.load('/home/shoichi/Documenti/FisicaLM/Cammarota/spml_exercises/notebooks/ex03_n40.npz').values())
+```
+
+```{python}
+plt.rcParams['axes.titley'] = 1
+plt.figure()
+plt.title("Generalization error vs. α$")
+plt.errorbar(Ps_N20/20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='r.', markersize=1, label='$N=20$')
+plt.errorbar(Ps_N40/40, epsilon_means_N40, yerr=epsilon_stds_N40, fmt='b.', markersize=1, label='$N=40$')
+plt.xlabel('α')
+plt.ylabel('$\epsilon$')
+plt.grid()
+plt.legend()
+plt.show()
+```
+
+## Step 1: Plot the parametric curve
+
+We want parametrize $\alpha=\alpha(t)$ and $\epsilon=\epsilon(t)$ with parameter $t\in[0, 0.5]$.
+
+Let's take 
+
+$$
+\alpha(t) = \frac{(1-t) \pi}{\tan(\pi t)}
+$$
+
+and $\epsilon(t)=t$.
+
+```{python}
+t_values = np.linspace(0.08, 0.5, 100)
+eps_values = t_values
+alpha_values = (1 - eps_values) * np.pi * 1. / np.tan(np.pi * eps_values)
+```
+
+```{python}
+plt.figure()
+plt.title('Data and parametric curve')
+plt.errorbar(Ps_N20/20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='r.', markersize=3, label='$N=20$')
+plt.errorbar(Ps_N40/40, epsilon_means_N40, yerr=epsilon_stds_N40, fmt='b.', markersize=3, label='$N=40$')
+plt.plot(alpha_values, eps_values, label='Parametric curve')
+plt.xlabel('α')
+plt.ylabel('$\epsilon$')
+plt.grid()
+plt.legend()
+plt.show()
+```
+
+## Step 2: Consider a strategy to solve iteratively the eqn for fixed $\alpha$
+
+Let us devise an iterative algorithm in order to find a solution for a certain $\alpha$.
+
+Say, for example, that $\alpha=5$. Given a self-consistent function of the form $\epsilon=f(\epsilon, a)$, we can:
+
+- Set an initial value $\epsilon_0 = 0.25$, for example, which is a good value in the codomain that we expect.
+- Evaluate iteratively $\epsilon_{i+1} = (1-a) \epsilon_i + a f(\epsilon_i, a)$
+- Plot how $\epsilon_i$ changes with $i$ to check for convergence at different settings of $a$.
+
+Here we have chosen, for example:
+
+$$
+f_2(\epsilon, \alpha) = 1 - \frac{\alpha \tan(\pi \epsilon)}{\pi}
+$$
+
+```{python}
+def my_f_epsilon(alpha, epsilon):
+    return 1 - alpha * np.tan(np.pi * epsilon) / np.pi
+```
+
+```{python}
+eps0 = 0.25
+alpha = 3
+
+fig, axs = plt.subplots(3, 2, figsize=(9,7))
+fig.suptitle('Convergence of iterative solution (α=5, $\epsilon_0=0.25$)')
+plt.rcParams['axes.titley'] = +.8
+for i, a in enumerate([0.001, 0.01, 0.1, 0.29, 0.5, 0.9]):
+    eps_current = eps0
+    eps_list = [eps_current]
+    for t in range(500):
+        eps_current = (1 - a) * eps_current + a * my_f_epsilon(alpha, eps_current)
+        eps_list.append(eps_current)
+    
+    axs[i//2][i%2].scatter(np.arange(0, 501), eps_list, s=0.3)
+    axs[i//2][i%2].set_title(f'a={a}')
+plt.show()
+```
+
+## Step 3: Check that a possible choice is $f=1-\alpha\tan(\pi\epsilon)/\pi$
+
+This is similar to the previous case, apart from the choice of $\alpha$. Let's check for the specific plots we are asked for.
+
+```{python}
+eps0 = 0.25
+alpha = 5
+
+fig, axs = plt.subplots(1, 3, figsize=(13,3))
+fig.suptitle('Convergence of iterative solution with function 1 (α=5, $\epsilon_0=0.25$)')
+plt.rcParams['axes.titley'] = +.8
+for i, a in enumerate([0.5, 0.9, 0.1]):
+    eps_current = eps0
+    eps_list = [eps_current]
+    for t in range(500):
+        eps_current = (1 - a) * eps_current + a * my_f_epsilon(alpha, eps_current)
+        eps_list.append(eps_current)
+    
+    axs[i].scatter(np.arange(0, 501), eps_list, s=0.3)
+    axs[i].set_title(f'a={a}')
+plt.show()
+```
+
+## Step 4: Check that a possible choice is $f=\arctan(\pi(1-\epsilon)/\alpha)/\pi$
+
+Let's see what happens with the following choice of the function, and the same parameters.
+
+$$
+f_1(\epsilon, \alpha) = \frac{1}{\pi} \arctan(\frac{\pi (1 - \epsilon)}{\alpha} )
+$$
+
+```{python}
+def my_f2_epsilon(alpha, epsilon):
+    return np.arctan(np.pi * (1 - epsilon) / alpha) / np.pi
+```
+
+```{python}
+eps0 = 0.25
+alpha = 5
+
+fig, axs = plt.subplots(1, 3, figsize=(13,3))
+fig.suptitle('Convergence of iterative solution with function 2 (α=5, $\epsilon_0=0.25$)')
+plt.rcParams['axes.titley'] = +.8
+for i, a in enumerate([0.5, 0.9, 0.1]):
+    eps_current = eps0
+    eps_list = [eps_current]
+    for t in range(500):
+        eps_current = (1 - a) * eps_current + a * my_f2_epsilon(alpha, eps_current)
+        eps_list.append(eps_current)
+    
+    axs[i].scatter(np.arange(0, 501), eps_list, s=0.3)
+    axs[i].set_title(f'a={a}')
+plt.show()
+```
+
+## Step 5 and 6: How do you explain the results?
+
+We see that in both cases the iterative algorithm reaches convergence, but not for all values of $a$. For $f_1$, for example, we reach convergence only for the lowest value ($a=1$). Meanwhile in the $f_2$ case we reach convergence in all the three cases. So **we deem $f_2$ to be a better candidate when looking for the solutions of the equation**.
+
+We know from the **Banach theorem** that we have guaranteed convergence over a recursive function $x=G(x)$ towards a fixed point if the fixed point $x^*$ exists, and if the absolute value of the derivative of the function is such that $|\frac{dG(x)}{dx}|_{x=x^*}<1$.
+
+In our case, if recursive functions are such that $\epsilon=G(\epsilon)$, the G functions are, respectively
+
+$$
+G_1(\epsilon) = (1-a)\epsilon + a(1-\frac{\alpha(\tan(\pi\epsilon))}{\pi})
+$$
+$$
+G_2(\epsilon) = (1-a)\epsilon + a(\frac{1}{\pi} \arctan(\frac{\pi(1-\epsilon)}{\alpha}))
+$$
+
+We can check analytically by computing the derivative in the fixed point, or graphically see which of the choices of $a$ yield to solutions that respect the condition in the neighbourhood of the fixed point.
+
+```{python}
+plt.rcParams['axes.titley'] = 1
+
+x = np.linspace(0, 0.4, 100)
+
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+for a in [0.1, 0.5, 0.9]:
+    axs[0].plot(x, (1-a) * x + a * my_f_epsilon(5, x), label=f'$f_1, a={a}$')
+    axs[1].plot(x, (1-a) * x + a * my_f2_epsilon(5, x), label=f'$f_2, a={a}$')
+
+axs[0].plot(x, x, label='$x=y$', c='grey', linestyle='dashed')
+axs[1].plot(x, x, label='$x=y$', c='grey', linestyle='dashed')
+
+axs[0].set_xlabel('$\epsilon$')
+axs[1].set_xlabel('$\epsilon$')
+
+axs[0].set_title('Graphical solution with $f_1$')
+axs[1].set_title('Graphical solution with $f_2$')
+axs[0].legend()
+axs[1].legend()
+axs[0].set_xlim([0, .4])
+axs[0].set_ylim([0, 1])
+axs[1].set_xlim([0, .4])
+axs[1].set_ylim([0, 1])
+
+axs[0].fill_between(x, x, -x+2*0.15531302362614938, color='red', alpha=0.2)
+axs[1].fill_between(x, x, -x+2*0.15531302362614938, color='red', alpha=0.2)
+
+plt.show()
+```
+
+We can perform a grid search over the parameter space of the $f_1$ convergence. The grid represents convergence plots, going from the left to the right with $\alpha$ values 1, 3, 5, 7, 9 and going from the top to the bottom with $a$ values 0.1, 0.3, 0.5, 0.7, 0.9.
+
+```{python}
+eps0 = 0.25
+plt.rcParams['axes.titley'] = 0.8
+
+fig, axs = plt.subplots(5, 5, figsize=(25, 25))
+for a_idx, a in enumerate([0.1, 0.3, 0.5, 0.7, 0.9]):
+    for alpha_idx, alpha in enumerate([1, 3, 5, 7, 9]):
+        eps_current = eps0
+        eps_list = [eps_current]
+        for t in range(500):
+            eps_current = (1 - a) * eps_current + a * my_f_epsilon(alpha, eps_current)
+            eps_list.append(eps_current)
+    
+        axs[a_idx][alpha_idx].scatter(np.arange(0, 501), eps_list, s=0.3)
+        axs[a_idx][alpha_idx].set_title(f'$a={a}, α={alpha}$')
+
+plt.show()
+```
+
+As $a$ grows, we can see the onset of non-convergent behaviour on progressively lower values of $\alpha$.
+
+We can check by doing a grid search over the parameter space that $f_2$ works much better. See the following grid: we have convergence for all the $\alpha$'s, for all settings of $a$. The grid represents convergence plots, going from the left to the right with $\alpha$ values 1, 3, 5, 7, 9 and going from the top to the bottom with $a$ values 0.1, 0.3, 0.5, 0.7, 0.9.
+
+```{python}
+eps0 = 0.25
+
+fig, axs = plt.subplots(5, 5, figsize=(25, 25))
+for a_idx, a in enumerate([0.1, 0.3, 0.5, 0.7, 0.9]):
+    for alpha_idx, alpha in enumerate([1, 3, 5, 7, 9]):
+        eps_current = eps0
+        eps_list = [eps_current]
+        for t in range(500):
+            eps_current = (1 - a) * eps_current + a * my_f2_epsilon(alpha, eps_current)
+            eps_list.append(eps_current)
+    
+        axs[a_idx][alpha_idx].scatter(np.arange(0, 501), eps_list, s=0.3)
+        axs[a_idx][alpha_idx].set_title(f'$a={a}, α={alpha}$')
+
+plt.show()
+```
+
+## Step 7 and 8: Use the chosen function to find the value of the function for many $\epsilon$'s and plot the final curves
+
+```{python}
+param_t_values = np.linspace(0.08, 0.5, 100)
+param_eps_values = param_t_values
+param_alpha_values = (1 - eps_values) * np.pi * 1. / np.tan(np.pi * eps_values)
+
+alpha_values = np.linspace(0.001, 10, 50)
+a = 0.9
+eps0 = 0.25
+eps_values = []
+for alpha_value in alpha_values:
+    eps_current = eps0
+    for t in range(50):
+        eps_prev = eps_current
+        eps_current = (1 - a) * eps_current + a * my_f2_epsilon(alpha_value, eps_current)
+        if abs(eps_prev - eps_current) < 0.001: break
+
+    eps_values.append(eps_current)
+```
+
+```{python}
+plt.rcParams['axes.titley'] = 1
+
+plt.figure()
+plt.title('Data and parametric curve')
+plt.errorbar(Ps_N20/20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='r.', markersize=3, label='$N=20$')
+plt.errorbar(Ps_N40/40, epsilon_means_N40, yerr=epsilon_stds_N40, fmt='b.', markersize=3, label='$N=40$')
+plt.plot(param_alpha_values, param_eps_values, label='Parametric curve')
+plt.scatter(alpha_values, eps_values, label='Numeric solutions', marker='x', s=10, color='tab:orange')
+plt.xlabel('α')
+plt.ylabel('$\epsilon$')
+plt.grid()
+plt.legend()
+plt.show()
+```
+
+The parametric curve and the numeric solutions agree perfectly, while the numeric solutions lie well below the formers.
+
