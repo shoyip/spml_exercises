@@ -1,0 +1,378 @@
+---
+title: 'Exercise 05: The quenched solution to randomised perceptron learning'
+jupyter: python3
+---
+
+```{python}
+import numpy as np
+import scipy.integrate as integrate
+from scipy.special import erfc
+import matplotlib.pyplot as plt
+```
+
+```{python}
+def I_integrand(R, v):
+    return 2. * np.exp(-(1.+R) * v*v / 2.) / (np.sqrt(2.*np.pi) * erfc(-np.sqrt(R/2.) * v))
+
+def I_func(R, lim=20):
+    integrate_result = integrate.quad(lambda x: I_integrand(R, x), -lim, +lim)
+    if integrate_result[1] < 0.001:
+        return integrate_result[0]
+    else:
+        raise ValueError(f'Error of numerical integral is higher than 0.001: {round(integrate_result[1], 4)}')
+
+vI_func = np.vectorize(I_func)
+```
+
+
+In this exercise we basically follow the same procedures of the last exercise, but instead of having the **annealed** analytical solution we use the **quenched** one and compare it with the data we obtained from Exercise 03.
+
+We hence have
+\begin{equation*}
+\frac{R}{\sqrt{1-R}} = \frac{\alpha}{\pi} \; I(R)
+\label{eq:quenched_eq} \tag{1}
+\end{equation*}
+where
+$$
+I(R) = \int_{-\infty}^{+\infty} \frac{dv}{2\pi} \frac{\exp[-(1+R)\,v^2/2]}{H(-\sqrt{R} v)}
+$$
+and
+$$
+H(u)= \int_{u}^{+\infty} \frac{dx}{\sqrt{2\pi}} \exp(-x^2/2) = \frac{1}{2} \text{erfc}(\frac{u}{\sqrt{2}}).
+$$
+
+Recall that
+$$
+\epsilon(R) = \frac{1}{\pi} \arccos(R).
+$$
+
+
+```{python}
+Rs = [0, 0.2, 0.4, 0.6, 0.8, 0.999]
+```
+
+We first make sure that the integrand that we chose can be effectively be integrated in a limited interval, such as $[-10,+10]$, without any heavy consequence over the computations. We can check that it has a bell-shape in the $[-5,+5]$ interval and elsewhere it is almost zero, for our domain of interest $R \in [0, 1.)$. We choose anyways, just to be safe, to integrate the function between $[-20, +20]$.
+
+```{python}
+plt.figure()
+
+for R in Rs:
+    x = np.linspace(-5, 5, 100)
+    y = []
+    for v in x:
+        y.append(I_integrand(R, v))
+    
+    plt.plot(x, y, label=f'R={round(R, 2)}')
+plt.legend()
+plt.grid()
+plt.title('Value of the integrand of $I(R)$')
+plt.show()
+```
+
+## Step 1: Choose a parameter and represent $\epsilon(\alpha)$ in a parametric plot
+
+Since it is present in both functions $\epsilon$ and $\alpha$, I will choose $R$ as my parameter of choice.
+
+$$
+t \equiv R
+$$
+
+I will hence have the following parametric expressions:
+$$
+\epsilon (t) = \frac{\arccos(t)}{\pi}
+$$
+and
+$$
+\alpha (t) = \frac{\pi t}{\sqrt{1-t}\;I(t)}.
+$$
+
+```{python}
+def eval_epsilon_param(t):
+    return np.arccos(t) / np.pi
+
+def eval_alpha_param(t):
+    return np.pi * t / (np.sqrt(1-t) * vI_func(t))
+```
+
+```{python}
+t1 = np.linspace(0.08, 0.5, 100)
+eps_param1 = t1
+alpha_param1 = (1 - t1) * np.pi * 1. / np.tan(np.pi * t1)
+
+t2 = np.linspace(0, .985, 100)
+eps_param2 = eval_epsilon_param(t2)
+alpha_param2 = eval_alpha_param(t2)
+```
+
+```{python}
+Ps_N20, epsilon_means_N20, epsilon_stds_N20 = list(np.load('/home/shoichi/Documenti/FisicaLM/Cammarota/spml_exercises/notebooks/ex03_n20.npz').values())
+Ps_N40, epsilon_means_N40, epsilon_stds_N40 = list(np.load('/home/shoichi/Documenti/FisicaLM/Cammarota/spml_exercises/notebooks/ex03_n40.npz').values())
+```
+
+The superimposition between data, parametric curve from the annealed computation (parametric curve 1) and parametric curve from the quenched computation (parametric curve 2) will look like this:
+
+```{python}
+plt.figure()
+plt.title('Data and parametric curves')
+plt.errorbar(Ps_N20/20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='r.', markersize=3, label='$N=20$')
+plt.errorbar(Ps_N40/40, epsilon_means_N40, yerr=epsilon_stds_N40, fmt='b.', markersize=3, label='$N=40$')
+plt.plot(alpha_param1, eps_param1, label='Parametric curve 1')
+plt.plot(alpha_param2, eps_param2, label='Parametric curve 2')
+plt.xlabel('α')
+plt.ylabel('$\epsilon$')
+plt.grid()
+plt.legend()
+plt.show()
+```
+
+## Step 2: Devise a strategy to explicitly solve equation $\eqref{eq:quenched_eq}$ for, say, $\alpha=5$
+
+We will, for example, rewrite the equation in an iterative form such as
+$$
+R \equiv f(R,\alpha) = 1 - (\frac{\pi R}{\alpha\; I(R)})^2
+$$
+and see whether for different values of the $a$, we get a convergence. We can see in the following plots that the algorithm converges in all cases.
+
+```{python}
+def my_f_R(R, alpha):
+    return 1. - (R * np.pi / (alpha * vI_func(R)))**2
+```
+
+```{python}
+R0 = 0.9
+alpha = 5
+
+fig, axs = plt.subplots(3, 2, figsize=(9,7))
+fig.suptitle('Convergence of iterative solution (α=5, $R_0=0.9$)')
+plt.rcParams['axes.titley'] = +.8
+for i, a in enumerate([0.001, 0.01, 0.1, 0.29, 0.5, 0.9]):
+    R_current = R0
+    R_list = [R0]
+    for t in range(500):
+        R_current = (1 - a) * R_current + a * my_f_R(R_current, alpha)
+        R_list.append(R_current)
+    
+    axs[i//2][i%2].scatter(np.arange(0, 501), R_list, s=0.3)
+    axs[i//2][i%2].set_title(f'a={a}')
+plt.show()
+```
+
+## Step 3: Check the possible choices of $f$ and verify if they converge
+
+Two possibilities are proposed:
+$$
+f_1(R,\alpha) = \frac{\alpha}{\pi} \sqrt{1-R} \; I(R)
+$$
+and
+$$
+f_2(R,\alpha) = 1 - (\frac{\pi R}{\alpha\; I(R)})^2
+$$
+which is, by the way, the function that we used in step 2.
+
+```{python}
+def my_f1_R(R, alpha):
+    return alpha * np.sqrt(1-R) * vI_func(R) / np.pi
+
+my_f2_R = my_f_R
+```
+
+```{python}
+R0 = 0.5
+alpha = .1
+a=0.5
+
+fig = plt.figure()
+fig.suptitle('Convergence of iterative solution (α=0.1, $R_0=0.5, a=0.5$)')
+R_current = R0
+R_list = [R0]
+for t in range(500):
+    R_current = (1 - a) * R_current + a * my_f1_R(R_current, alpha)
+    R_list.append(R_current)
+    
+plt.scatter(np.arange(0, 501), R_list, s=0.3)
+plt.xlabel('i')
+plt.ylabel('R')
+plt.show()
+```
+
+Instead if we try to do the same with $\alpha=5$ we get:
+
+```{python}
+try:
+    R0 = 0.5
+    alpha = 5.
+    a=0.5
+    
+    fig = plt.figure()
+    fig.suptitle('Convergence of iterative solution (α=0.1, $R_0=0.5, a=0.5$)')
+    R_current = R0
+    R_list = [R0]
+    for t in range(500):
+        R_current = (1 - a) * R_current + a * my_f1_R(R_current, alpha)
+        R_list.append(R_current)
+        
+    plt.scatter(np.arange(0, 501), R_list, s=0.3)
+    plt.xlabel('i')
+    plt.ylabel('R')
+    plt.show()
+except Exception as exc:
+    print(exc)
+```
+
+As we can see the integration in this case explodes and yields to an error. This is probably due to convergence properties not being satisfied by $f_1$. Instead $f_2$, as we can see in the following, converges for high values of $\alpha$ but not for low ones.
+
+```{python}
+try:
+    R0 = .5
+    alpha = .1
+    a=.5
+    
+    fig = plt.figure()
+    fig.suptitle('Convergence of iterative solution (α=.1, $R_0=0.5, a=0.5$)')
+    R_current = R0
+    R_list = [R0]
+    for t in range(500):
+        R_current = (1 - a) * R_current + a * my_f_R(R_current, alpha)
+        R_list.append(R_current)
+        
+    plt.scatter(np.arange(0, 501), R_list, s=0.3)
+    plt.xlabel('i')
+    plt.ylabel('R')
+    plt.show()
+except Exception as exc:
+    print(exc)
+```
+
+```{python}
+R0 = .5
+alpha = 5.
+a= .5
+
+fig = plt.figure()
+fig.suptitle('Convergence of iterative solution (α=5, $R_0=0.5, a=0.5$)')
+R_current = R0
+R_list = [R0]
+for t in range(500):
+    R_current = (1 - a) * R_current + a * my_f2_R(R_current, alpha)
+    R_list.append(R_current)
+    
+plt.scatter(np.arange(0, 501), R_list, s=0.3)
+plt.xlabel('i')
+plt.ylabel('R')
+plt.show()
+```
+
+## Step 4: Is any of the two choices suitable over the entire range?
+
+**No**, both have limitations over the range where they yield to convergent results.
+
+## Step 5: Set up an automatic procedure to determine $\epsilon(\alpha)$ over $\alpha \in [0, 10]$
+
+Let's see the recursive functions plotted in order to understand the situation better.
+
+```{python}
+plt.rcParams['axes.titley'] = 1
+
+x = np.linspace(0, 1, 100)
+
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+for a in [0.1, 0.5, 0.9]:
+    axs[0].plot(x, (1-a) * x + a * my_f1_R(x, .1), label=f'$f_1, a={a}$')
+    axs[1].plot(x, (1-a) * x + a * my_f2_R(x, 5), label=f'$f_2, a={a}$')
+
+axs[0].plot(x, x, label='$x=y$', c='grey', linestyle='dashed')
+axs[1].plot(x, x, label='$x=y$', c='grey', linestyle='dashed')
+
+axs[0].set_xlabel('$R$')
+axs[1].set_xlabel('$R$')
+
+axs[0].set_title('Graphical solution with $f_1$ in $α=0.1$')
+axs[1].set_title('Graphical solution with $f_2$ in $α=5$')
+axs[0].legend()
+axs[1].legend()
+axs[0].set_xlim([0, .2])
+axs[0].set_ylim([0, .2])
+axs[1].set_xlim([0.8, 1])
+axs[1].set_ylim([0.7, 1])
+
+axs[0].fill_between(x, x, -x+2*0.0621745597603611, color='red', alpha=0.2)
+axs[1].fill_between(x, x, -x+2*0.9320642456641342, color='red', alpha=0.2)
+
+plt.show()
+```
+
+The choice of the function over the $\alpha$'s seems to give us some problems. Analytical computation of the absolute value of the parametric function seems to be a little bit too cumbersome, but we can see by tweaking the parameters which values do bring to convergence with which function. For example, it seems that choosing $f_1$ for $\alpha < 5$ and $f_2$ for values of $\alpha \geq 5$ is a good criterion for reaching convergence over the entire domain of $\alpha$.
+
+We will hence (arbitrarily) choose to use the following rule
+$$
+f=
+\begin{cases}
+\frac{\alpha}{\pi} \sqrt{1-R} \; I(R) & \alpha < 5 \\
+1 - (\frac{\pi R}{\alpha\; I(R)})^2 & \alpha \geq 5
+\end{cases}
+$$
+with $a=0.02$ (found good value by trial and error).
+
+```{python}
+R0 = 0.5
+a = 0.02
+
+fig, axs = plt.subplots(3,2,figsize=(9,7))
+fig.suptitle('Convergence of algorithm for mixed strategy ($R_0=0.5, a=0.02$)')
+for i, alpha in enumerate([0.1, 1, 1.5, 5, 10, 20]):
+    R_current = R0
+    R_list = [R0]
+    for t in range(500):
+        R_prev = R_current
+        param_f = my_f1_R if alpha < 5 else my_f2_R
+        R_current = (1 - a) * R_current + a * param_f(R_current, alpha) 
+        R_list.append(R_current)
+    axs[i//2][i%2].scatter(list(range(501)), R_list, s=1)
+    fstr = 'f_1' if alpha < 5 else 'f_2'
+    axs[i//2][i%2].set_title(f'$α={alpha}, {fstr}$')
+plt.tight_layout()
+plt.show()
+```
+
+## Step 6: Plot the obtained curve on top of the parametric plot and the numerical results
+
+```{python}
+def get_R_value(alpha, R0=0.5, a=0.02):
+    R_current = R0
+    R_list = [R0]
+    for t in range(500):
+        R_prev = R_current
+        param_f = my_f1_R if alpha < 5 else my_f2_R
+        R_current = (1 - a) * R_current + a * param_f(R_current, alpha) 
+        R_list.append(R_current)
+    if np.std(R_list[-100:]) < 0.001:
+        return R_current
+    else:
+        print(f"Seems that for alpha={alpha} the algorithm did not converge!")
+```
+
+```{python}
+alpha_values = np.linspace(0.001, 10, 20)
+vget_R_value = np.vectorize(get_R_value)
+
+epsilon_values = np.arccos(vget_R_value(alpha_values)) / np.pi
+```
+
+```{python}
+plt.rcParams['axes.titley'] = 1
+
+plt.figure()
+plt.title('Numerical, parametric and explicit eqn solving curves')
+plt.errorbar(Ps_N20/20, epsilon_means_N20, yerr=epsilon_stds_N20, fmt='r.', markersize=3, label='Num Simulations $N=20$')
+plt.errorbar(Ps_N40/40, epsilon_means_N40, yerr=epsilon_stds_N40, fmt='b.', markersize=3, label='Num Simulations $N=40$')
+plt.plot(alpha_param1, eps_param1, label='Annealed Parametric')
+plt.plot(alpha_param2, eps_param2, label='Quenched Parametric')
+plt.scatter(alpha_values, epsilon_values, label='Quenched Explicit Eqn', marker='x', s=10, color='tab:orange')
+plt.xlabel('α')
+plt.ylabel('$\epsilon$')
+plt.grid()
+plt.legend()
+plt.show()
+```
+
